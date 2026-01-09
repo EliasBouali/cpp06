@@ -72,19 +72,19 @@ static bool is_single_quoted_char(const std::string &s)
 
 static bool is_single_char(const std::string &s)
 {
-  return (s.size() == 1 && !std::isdigit(static_cast<unsigned char>(s[0])));
+  return (s.size() == 1 && std::isalpha(static_cast<unsigned char>(s[0])));
 }
 
 static bool parse_double_strict(const std::string& s, double& out)
 {
   errno = 0;
-  char* firts_invalid = 0;
+  char* first_invalid = 0;
   const char* cstr = s.c_str();
-  out = std::strtod(cstr, &firts_invalid);
+  out = std::strtod(cstr, &first_invalid);
 
-  if (firts_invalid == cstr)
+  if (first_invalid == cstr)
       return false;
-  if (*firts_invalid != '\0')
+  if (*first_invalid != '\0')
       return false;
   if (errno == ERANGE)
       std::cerr << "Warning: overflow or underflow during parsing\n";
@@ -164,59 +164,77 @@ static void print_char(double d)
 
 static void print_int(double d)
 {
-    std::cout << "int: ";
-    if (is_nan(d) || is_inf(d))
-    {
-        std::cout << "impossible\n";
-        return;
-    }
+  std::cout << "int: ";
+  if (is_nan(d) || is_inf(d))
+  {
+    std::cout << "impossible\n";
+    return;
+  }
 
-    if (d < static_cast<double>(std::numeric_limits<int>::min()) ||
-        d > static_cast<double>(std::numeric_limits<int>::max()))
-    {
-        std::cout << "impossible\n";
-        return;
-    }
-
-    int n = static_cast<int>(d);
-    std::cout << n << "\n";
+  if (d < static_cast<double>(std::numeric_limits<int>::min()) ||
+      d > static_cast<double>(std::numeric_limits<int>::max()))
+  {
+    std::cout << "impossible\n";
+    return;
+  }
+  int n = static_cast<int>(d);
+  std::cout << n << "\n";
 }
 
 
 static void print_float(double d)
 {
-    std::cout << "float: ";
-    if (is_nan(d))
-    {
-        std::cout << "nanf\n";
-        return;
-    }
-    if (is_pos_inf(d))
-    {
-        std::cout << "+inff\n";
-        return;
-    }
-    if (is_neg_inf(d))
-    {
-        std::cout << "-inff\n";
-        return;
-    }
+  std::cout << "float: ";
+  if (is_nan(d))
+  {
+      std::cout << "nanf\n";
+      return;
+  }
+  if (is_pos_inf(d))
+  {
+      std::cout << "+inff\n";
+      return;
+  }
+  if (is_neg_inf(d))
+  {
+      std::cout << "-inff\n";
+      return;
+  }
 
-    float f = static_cast<float>(d);
+  const double fmax = static_cast<double>(std::numeric_limits<float>::max());
+  if (d > fmax)
+  {
+      std::cout << "+inff\n";
+      return;
+  }
+  if (d < -fmax)
+  {
+      std::cout << "-inff\n";
+      return;
+  }
 
-    std::ostringstream oss;
+  float f = static_cast<float>(d);
+  std::ostringstream oss;
 
-    if (is_integral_value(d))
-        oss << std::fixed << std::setprecision(1) << f;
+  double ad = ::fabs(d);
+
+  if (is_integral_value(d))
+  {
+    if (ad >= 1e6)
+      oss << std::scientific << std::setprecision(1) << f; 
     else
-        oss << std::setprecision(std::numeric_limits<float>::digits10 + 1) << f;
+      oss << std::fixed << std::setprecision(1) << f;
+  }
+  else
+      oss << std::setprecision(std::numeric_limits<float>::digits10 + 1) << f;
 
-    std::cout << oss.str() << "f\n";
+  std::cout << oss.str() << "f\n";
 }
 
 static void print_double(double d)
 {
     std::cout << "double: ";
+
     if (is_nan(d))
     {
         std::cout << "nan\n";
@@ -235,20 +253,30 @@ static void print_double(double d)
 
     std::ostringstream oss;
 
-    if (is_integral_value(d))
-        oss << std::fixed << std::setprecision(1) << d;
-    else
-        oss << std::setprecision(std::numeric_limits<double>::digits10 + 1) << d;
+    double ad = ::fabs(d);
 
-    std::cout << oss.str() << "f\n";
+    if (is_integral_value(d))
+    {
+        if (ad >= 1e6)
+            oss << std::scientific << std::setprecision(1) << d;
+        else
+            oss << std::fixed << std::setprecision(1) << d;
+    }
+    else
+    {
+        oss << std::setprecision(std::numeric_limits<double>::digits10 + 1) << d;
+    }
+
+    std::cout << oss.str() << "\n";
 }
+
 
 static void print_all_from_double(double d)
 {
-    print_char(d);
-    print_int(d);
-    print_float(d);
-    print_double(d);
+  print_char(d);
+  print_int(d);
+  print_float(d);
+  print_double(d);
 }
 
 
@@ -265,7 +293,6 @@ void ScalarConverter::convert(const std::string& literal)
 
   if (is_pseudo(literal))
   {
-    // char & int are impossible
     std::cout << "char: impossible\n";
     std::cout << "int: impossible\n";
 
@@ -284,62 +311,60 @@ void ScalarConverter::convert(const std::string& literal)
       std::cout << "float: +inff\n";
       std::cout << "double: +inf\n";
     }
-        else if (literal == "-inf")
-        {
-            std::cout << "float: -inff\n";
-            std::cout << "double: -inf\n";
-        }
-        else if (literal == "+inff")
-        {
-            std::cout << "float: +inff\n";
-            std::cout << "double: +inf\n";
-        }
-        else if (literal == "-inff")
-        {
-            std::cout << "float: -inff\n";
-            std::cout << "double: -inf\n";
-        }
-        return;
-    }
-
-    // char literal forms
-    if (is_single_quoted_char(literal))
+    else if (literal == "-inf")
     {
-        double d = static_cast<double>(literal[1]);
-        print_all_from_double(d);
-        return;
+        std::cout << "float: -inff\n";
+        std::cout << "double: -inf\n";
     }
-    if (is_single_char(literal))
+    else if (literal == "+inff")
     {
-        double d = static_cast<double>(literal[0]);
-        print_all_from_double(d);
-        return;
+        std::cout << "float: +inff\n";
+        std::cout << "double: +inf\n";
     }
-
-    // numeric detection
-    eType t = detect_number_type(literal);
-    if (t == T_INVALID)
+    else if (literal == "-inff")
     {
-        std::cout << "char: impossible\n";
-        std::cout << "int: impossible\n";
-        std::cout << "float: impossible\n";
-        std::cout << "double: impossible\n";
-        return;
+        std::cout << "float: -inff\n";
+        std::cout << "double: -inf\n";
     }
+    return;
+  }
 
-    std::string to_parse = literal;
-    if (t == T_FLOAT)
-        to_parse = literal.substr(0, literal.size() - 1); // remove trailing 'f'
+  if (is_single_quoted_char(literal))
+  {
+      double d = static_cast<double>(literal[1]);
+      print_all_from_double(d);
+      return;
+  }
+  if (is_single_char(literal))
+  {
+      double d = static_cast<double>(literal[0]);
+      print_all_from_double(d);
+      return;
+  }
 
-    double d;
-    if (!parse_double_strict(to_parse, d))
-    {
-        std::cout << "char: impossible\n";
-        std::cout << "int: impossible\n";
-        std::cout << "float: impossible\n";
-        std::cout << "double: impossible\n";
-        return;
-    }
+  eType t = detect_number_type(literal);
+  if (t == T_INVALID)
+  {
+      std::cout << "char: impossible\n";
+      std::cout << "int: impossible\n";
+      std::cout << "float: impossible\n";
+      std::cout << "double: impossible\n";
+      return;
+  }
 
-    print_all_from_double(d);
+  std::string to_parse = literal;
+  if (t == T_FLOAT)
+      to_parse = literal.substr(0, literal.size() - 1);
+
+  double d;
+  if (!parse_double_strict(to_parse, d))
+  {
+      std::cout << "char: impossible\n";
+      std::cout << "int: impossible\n";
+      std::cout << "float: impossible\n";
+      std::cout << "double: impossible\n";
+      return;
+  }
+
+  print_all_from_double(d);
 }
